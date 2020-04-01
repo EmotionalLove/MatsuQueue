@@ -1,5 +1,7 @@
 package me.someonelove.matsuqueue.bungee;
 
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
@@ -19,7 +21,6 @@ public final class Matsu extends Plugin {
 
     public static ConfigurationFile CONFIG;
     public static Matsu INSTANCE;
-
     public static ScheduledExecutorService executorService = Executors.newScheduledThreadPool(4);
 
     /**
@@ -32,6 +33,8 @@ public final class Matsu extends Plugin {
 
     public static boolean queueServerOk = true;
     public static boolean destinationServerOk = true;
+    private static boolean isLuckPermsOk = false;
+
 
     @Override
     public void onEnable() {
@@ -39,6 +42,17 @@ public final class Matsu extends Plugin {
         INSTANCE = this;
         getLogger().log(Level.INFO, "MatsuQueue is loading.");
         CONFIG = new ConfigurationFile();
+        if (CONFIG.useLuckPerms) {
+            try {
+                getLogger().log(Level.INFO, "Detected value TRUE for LuckPerms, trying to open API connection...");
+                LuckPerms api = LuckPermsProvider.get();
+                getLogger().log(Level.INFO, "LuckPerms API connection successfully established!");
+            } catch (Exception e) {
+                    getLogger().log(Level.SEVERE, "Error during loading LuckPerms API - perhaps the plugin isn't installed? - " + e);
+            }
+        } else {
+            getLogger().log(Level.INFO, "Currently using BungeeCord permissions system - switch to LuckPerms in config.");
+        }
         this.getProxy().getPluginManager().registerListener(this, new EventReactions());
         executorService.scheduleWithFixedDelay(() -> {
             purgeQueues();

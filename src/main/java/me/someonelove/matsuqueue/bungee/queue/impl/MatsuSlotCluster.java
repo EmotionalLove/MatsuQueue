@@ -3,6 +3,10 @@ package me.someonelove.matsuqueue.bungee.queue.impl;
 import me.someonelove.matsuqueue.bungee.Matsu;
 import me.someonelove.matsuqueue.bungee.queue.IMatsuQueue;
 import me.someonelove.matsuqueue.bungee.queue.IMatsuSlotCluster;
+import net.luckperms.api.LuckPermsProvider;
+import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.NodeType;
+import net.luckperms.api.node.types.PermissionNode;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Listener;
@@ -10,6 +14,7 @@ import net.md_5.bungee.api.plugin.Listener;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class MatsuSlotCluster implements IMatsuSlotCluster, Listener {
@@ -19,7 +24,6 @@ public class MatsuSlotCluster implements IMatsuSlotCluster, Listener {
     private int max;
     private List<UUID> slots = Collections.synchronizedList(new LinkedList<>());
     private ConcurrentHashMap<String, IMatsuQueue> associatedQueues = new ConcurrentHashMap<>();
-
     public MatsuSlotCluster(String name, int capacity, String permission) {
         this.name = name;
         this.max = capacity;
@@ -42,17 +46,35 @@ public class MatsuSlotCluster implements IMatsuSlotCluster, Listener {
             occupySlot(player);
             return;
         }
-        for (Map.Entry<String, IMatsuQueue> entry : associatedQueues.entrySet()) {
-            for (String permission : player.getPermissions()) {
-                if (!permission.contains(".") || !permission.startsWith("matsuqueue")) continue;
-                String[] broken = permission.split("\\.");
-                if (broken.length != 3) continue;
-                if (entry.getValue().getPermission().equals(broken[2])) {
-                    entry.getValue().addPlayerToQueue(player);
-                    return;
+
+        if (Matsu.CONFIG.useLuckPerms) {
+            for (Map.Entry<String, IMatsuQueue> entry : associatedQueues.entrySet()) {
+                User lplayer;
+                lplayer = LuckPermsProvider.get().getUserManager().getUser(player.getUniqueId());
+                Set<String> perms = lplayer.getNodes().stream()
+                        .filter(NodeType.PERMISSION::matches).map(NodeType.PERMISSION::cast).map(PermissionNode::getKey).collect(Collectors.toSet());
+                for (String perm : perms) {
+                    if (!perm.contains(".") || !perm.startsWith("matsuqueue")) continue;
+                    String[] broken = perm.split("\\.");
+                    if (broken.length != 3) continue;
+                    Matsu.INSTANCE.getLogger().log(Level.INFO, perm + " - " + broken[0] + "." + broken[1] + "." + broken[2] + " - " + entry.getValue().getPermission());
+                    if (entry.getValue().getPermission().equals(broken[2])) {
+                        entry.getValue().addPlayerToQueue(player);
+                        return;
+                    }
+                }
+                for (String permission : player.getPermissions()) {
+                    if (!permission.contains(".") || !permission.startsWith("matsuqueue")) continue;
+                    String[] broken = permission.split("\\.");
+                    if (broken.length != 3) continue;
+                    if (entry.getValue().getPermission().equals(broken[2])) {
+                        entry.getValue().addPlayerToQueue(player);
+                        return;
+                    }
                 }
             }
         }
+
         // code quality goes to shit after my brain goes numb ;-;
         for (Map.Entry<String, IMatsuQueue> entry : associatedQueues.entrySet()) {
             if (entry.getValue().getPermission().equals("default")) {
